@@ -24,13 +24,20 @@ interface KanbanBoardProps {
   onMigrate?: (leadId: string) => void;
 }
 
-export function KanbanBoard({ stages, initialLeads, pipelineType, onMigrate }: KanbanBoardProps) {
+export function KanbanBoard({
+  stages,
+  initialLeads,
+  pipelineType,
+  onMigrate,
+}: KanbanBoardProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    })
   );
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
@@ -59,9 +66,7 @@ export function KanbanBoard({ stages, initialLeads, pipelineType, onMigrate }: K
     const activeLeadId = active.id as string;
     const overId = over.id as string;
 
-    // Check if overId is a stage
     const isOverStage = stages.some((s) => s.id === overId);
-    // Check if overId is a lead
     const overLead = leads.find((l) => l.id === overId);
 
     let targetStageId: string | null = null;
@@ -96,7 +101,33 @@ export function KanbanBoard({ stages, initialLeads, pipelineType, onMigrate }: K
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-3 overflow-x-auto pb-4 md:grid md:overflow-x-visible" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
+      {/*
+        Mobile (<md): vertical accordion list — no horizontal scroll needed.
+        Desktop (md+): horizontal row of columns with horizontal scroll safety net.
+      */}
+
+      {/* Mobile accordion layout */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {stages.map((stage) => (
+          <KanbanColumn
+            key={stage.id}
+            stage={stage}
+            leads={getLeadsForStage(stage.id)}
+            showMigrateButton={pipelineType === "b2c"}
+            onMigrate={onMigrate}
+            accordionMode
+          />
+        ))}
+      </div>
+
+      {/* Desktop kanban layout */}
+      <div
+        className="hidden md:flex gap-3 overflow-x-auto pb-4"
+        style={{
+          /* Each column is at least 240px, scales equally */
+          gridTemplateColumns: `repeat(${stages.length}, minmax(240px, 1fr))`,
+        }}
+      >
         {stages.map((stage) => (
           <KanbanColumn
             key={stage.id}
@@ -108,9 +139,9 @@ export function KanbanBoard({ stages, initialLeads, pipelineType, onMigrate }: K
         ))}
       </div>
 
-      <DragOverlay>
+      <DragOverlay dropAnimation={{ duration: 150, easing: "ease" }}>
         {activeLead ? (
-          <div className="w-[260px]">
+          <div className="w-[272px] rotate-2 opacity-90">
             <LeadCard lead={activeLead} />
           </div>
         ) : null}

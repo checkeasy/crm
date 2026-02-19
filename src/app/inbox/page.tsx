@@ -39,18 +39,23 @@ export default function InboxPage() {
     [messages, selectedId]
   );
 
-  const handleStatusChange = useCallback((messageId: string, status: MessageStatus) => {
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, status } : m))
-    );
-  }, []);
+  const handleStatusChange = useCallback(
+    (messageId: string, status: MessageStatus) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, status } : m))
+      );
+    },
+    []
+  );
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
-    // Mark as read if unread
+    // Auto-mark as in_progress when opened
     setMessages((prev) =>
       prev.map((m) =>
-        m.id === id && m.status === "unread" ? { ...m, status: "in_progress" as MessageStatus } : m
+        m.id === id && m.status === "unread"
+          ? { ...m, status: "in_progress" as MessageStatus }
+          : m
       )
     );
   }, []);
@@ -60,84 +65,116 @@ export default function InboxPage() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 h-full">
+      {/* Page header */}
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Inbox</h2>
-          <p className="text-muted-foreground text-sm">
+          <h2 className="text-xl font-bold tracking-tight md:text-2xl">
+            Inbox
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Messages entrants centralises.
           </p>
         </div>
         {unreadCount > 0 && (
-          <Badge variant="default" className="text-sm">
+          <Badge variant="default" className="text-sm shrink-0">
             {unreadCount} non lu{unreadCount > 1 ? "s" : ""}
           </Badge>
         )}
       </div>
 
-      {/* Filters */}
+      {/* Filter tabs */}
       <div className="flex gap-1.5 flex-wrap">
         {(Object.keys(filterLabels) as FilterType[]).map((f) => {
-          const count = f === "all" ? messages.length : messages.filter((m) => m.status === f).length;
+          const count =
+            f === "all"
+              ? messages.length
+              : messages.filter((m) => m.status === f).length;
           return (
             <Button
               key={f}
               variant={filter === f ? "default" : "outline"}
               size="sm"
               onClick={() => setFilter(f)}
-              className="h-8"
+              className="min-h-[36px] gap-1.5"
             >
               {filterLabels[f]}
-              <span className="ml-1.5 text-[10px] opacity-70">{count}</span>
+              <span
+                className={cn(
+                  "inline-flex items-center justify-center text-[10px] font-medium rounded-full w-4 h-4",
+                  filter === f
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {count}
+              </span>
             </Button>
           );
         })}
       </div>
 
-      {/* Two column layout */}
-      <div className="flex gap-4 min-h-[calc(100vh-220px)]">
-        {/* Left: Message list */}
+      {/*
+        Two-column layout:
+        - Mobile: show list OR detail (single column, toggled by selectedId)
+        - Desktop (md+): side-by-side, list fixed width + detail fills remaining space
+      */}
+      <div className="flex gap-4 flex-1 min-h-0" style={{ minHeight: "calc(100vh - 240px)" }}>
+        {/* LEFT — Message list */}
         <div
           className={cn(
-            "w-full md:w-[380px] md:shrink-0 border border-border rounded-lg overflow-y-auto p-2",
-            selectedId && "hidden md:block"
+            "flex flex-col w-full md:w-[360px] md:shrink-0",
+            "border border-border rounded-xl overflow-hidden",
+            // On mobile, hide list when a message is selected
+            selectedId ? "hidden md:flex" : "flex"
           )}
         >
-          {filteredMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <InboxIcon className="h-10 w-10 mb-3 opacity-50" />
-              <p className="text-sm">Aucun message</p>
-            </div>
-          ) : (
-            <MessageList
-              messages={filteredMessages}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-            />
-          )}
+          <div className="flex-1 overflow-y-auto p-2">
+            {filteredMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                <InboxIcon className="h-10 w-10 opacity-30" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">Aucun message</p>
+                  <p className="text-xs mt-1 opacity-70">
+                    Changez le filtre pour voir plus de messages
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <MessageList
+                messages={filteredMessages}
+                selectedId={selectedId}
+                onSelect={handleSelect}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Right: Message detail */}
+        {/* RIGHT — Message detail */}
         <div
           className={cn(
-            "flex-1 border border-border rounded-lg p-4 overflow-y-auto",
-            !selectedId && "hidden md:flex md:items-center md:justify-center"
+            "flex flex-col flex-1 border border-border rounded-xl overflow-hidden",
+            // On mobile, hide detail when nothing is selected
+            !selectedId ? "hidden md:flex" : "flex"
           )}
         >
           {selectedMessage ? (
-            <MessageDetail
-              message={selectedMessage}
-              templates={responseTemplates}
-              allMessages={messages}
-              onStatusChange={handleStatusChange}
-              onBack={handleBack}
-            />
+            <div className="flex-1 overflow-y-auto p-4">
+              <MessageDetail
+                message={selectedMessage}
+                templates={responseTemplates}
+                allMessages={messages}
+                onStatusChange={handleStatusChange}
+                onBack={handleBack}
+              />
+            </div>
           ) : (
-            <div className="text-center text-muted-foreground">
-              <InboxIcon className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Selectionnez un message</p>
-              <p className="text-xs mt-1">Choisissez un message dans la liste pour voir les details</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+              <InboxIcon className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-sm font-medium">Selectionnez un message</p>
+              <p className="text-xs mt-1.5 max-w-[240px] leading-relaxed opacity-70">
+                Choisissez un message dans la liste pour voir les details et repondre
+              </p>
             </div>
           )}
         </div>
